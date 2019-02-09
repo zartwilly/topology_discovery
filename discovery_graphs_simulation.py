@@ -1,0 +1,598 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Jan 11 11:04:20 2019
+
+@author: willy
+
+fichier main. 
+contient :
+    * la generation de n graphes GR_n et line-graphes LG_n
+    * partitionnement en cliques de chacun LG_n
+
+"""
+
+import os;
+import math;
+import time;
+import random;
+import logging;
+import subprocess;
+import numpy as np;
+import pandas as pd;
+
+import itertools as it;
+import multiprocessing as mp; 
+
+import clique_max as clique;
+import genererMatA as geneMatA;
+import fonctions_auxiliaires as fct_aux;
+import generations_mesures as mesures;
+import algo_couverture as algoCouverture;
+
+from pathlib import Path    # http://stackoverflow.com/questions/6004073/how-can-i-create-directories-recursively
+from multiprocessing import Pool;
+
+
+INDEX_COL_MATE_LG = "Unnamed: 0";
+INDEX_COL_MAT_GR = "nodes";
+NOM_MATE_LG = "matE_generer.csv";
+NOM_MAT_GR = "mat_generer.csv"
+###############################################################################
+###############################################################################
+
+
+###############################################################################
+#                    graphe double couverture --> debut
+###############################################################################
+def graphe_double_couverture(chemin_dataset, 
+                             chemin_matrice,
+                             nbre_ts = 10, 
+                             effet_joule = 0.8):
+    """
+    generer les graphes et leur line-graphes ayant une double couverture 
+    selon l'article
+    """
+    dico_triangle = dict();
+    dico_etoile = dict();
+    dico_marteau = dict();
+    dico_losange = dict();
+    dico_carre = dict();
+    
+    dico_triangle = {"1":["2","3"], "2":["3","1"],"3":["2","1"]};
+    dico_etoile = {"1":["2"], "2":["1","3","4"],
+                   "3":["2"], "4":["2"]};
+    dico_marteau = {"1":["2"], "2":["1","3","4"],
+                    "3":["2","4"], "4":["2","3"]};
+    dico_losange = {"1":["2","3"], "2":["1","4"],
+                    "3":["1","4"], "4":["2","3"]};
+    dico_carre = {"1":["2","3","4"], "2":["1","3","4"],
+                  "3":["1","2","4"], "4":["1","2","4"]}
+    
+    for dico in [dico_triangle, dico_etoile, 
+                 dico_marteau, dico_losange, 
+                 dico_carre] :
+        mat_GR = pd.DataFrame(columns = dico.keys(), 
+                          index = dico.keys())
+        for key, vals in dico.items():
+            for val in vals :
+                mat_GR.loc[key, val] = 1;
+                mat_GR.loc[val, key] = 1;
+        mat_GR.fillna(0,inplace = True);
+        mat_GR.index.rename(INDEX_COL_MAT_GR,inplace=True)
+        
+        dico_arcs_sommets = nommage_arcs(mat_GR)
+        datasets = list();
+        datasets = mesures.create_datasets_new(mat_GR,
+                                               dico_arcs_sommets,
+                                               nbre_ts, effet_joule)
+        
+        path_dataset = Path(chemin_dataset);
+        if not path_dataset.is_dir() :
+            path_dataset.mkdir(parents=True, exist_ok=True)
+        for dfs in datasets :
+            dfs[1].to_csv(chemin_dataset+"dataset_"+dfs[0]+".csv", 
+                            index = False) 
+        
+        #matrice du linegraphe du reseau de flot a determiner
+        arcs = fct_aux.liste_arcs(mat_GR);
+#        print("dico_arcs_old={}".format(dico_arcs_sommets.keys()))
+        matE_LG, dico_arcs_sommets = creer_matE(arcs)
+#        print("dico_arcs_new={}".format(dico_arcs_sommets.keys()))
+        path_matrice = Path(chemin_matrice);
+        if not path_matrice.is_dir() :
+            path_matrice.mkdir(parents=True, exist_ok=True)
+        matE_LG.to_csv(chemin_matrice + NOM_MATE_LG, 
+                       index_label=INDEX_COL_MATE_LG)
+        mat_GR.to_csv(chemin_matrice + NOM_MAT_GR)
+        
+        yield matE_LG, mat_GR, dico_arcs_sommets;
+        
+###############################################################################
+#                    graphe double couverture --> fin
+###############################################################################        
+    
+###############################################################################
+#               generation graphes de flots ---> debut
+###############################################################################  
+def nommage_arcs(mat):
+    """ 
+    nommage des arcs du graphe du reseau energetique.
+    
+    elle retourne un dictionnaire avec :
+        la cle : le nom de l'arc
+        la valeur : le tuple correspondant a l'arc
+        
+    """
+    dico_arcs_sommets = dict();
+    for arc in fct_aux.liste_arcs(mat):
+        dico_arcs_sommets["_".join(arc)] = arc;
+    return dico_arcs_sommets
+
+def nommage_aretes(mat_GR):
+    """ 
+    nommage des aretes du graphe mat_GR.
+    
+    elle retourne un dictionnaire avec :
+        la cle : le nom de l'arc tel que arc[0] < arc[1]
+        la valeur : le tuple correspondant a l'arc tel que arc[0] < arc[1]
+    """ 
+    aretes = [];
+    dico_arcs_sommets = dict();
+    
+    for arc in fct_aux.liste_arcs(mat_GR):
+        arete = "";
+        if arc[0] < arc[1]:
+            arete = arc;
+            aretes.append(list(arete))
+        else:
+            arete = (arc[1], arc[0]);
+            aretes.append(list(arete));
+        dico_arcs_sommets["_".join(arete)] = arete;  
+    return dico_arcs_sommets;
+    
+def creer_matE_LG_from_mat_GR(chemin_dataset, 
+                              chemin_matrice, 
+                              mat_GR,
+                              nbre_ts, 
+                              effet_joule):
+    """
+    creer du line-graphe a partir de mat_GR.
+    
+    """
+    dico_arcs_sommets = nommage_arcs(mat_GR)
+    datasets = list();
+    datasets = mesures.create_datasets_new(mat_GR,
+                                           dico_arcs_sommets,
+                                           nbre_ts, effet_joule)
+   
+    path_dataset = Path(chemin_dataset);
+    if not path_dataset.is_dir() :
+        path_dataset.mkdir(parents=True, exist_ok=True)
+    for dfs in datasets :
+        dfs[1].to_csv(chemin_dataset+"dataset_"+dfs[0]+".csv", 
+                        index = False) 
+    
+    #matrice du linegraphe du reseau de flot a determiner
+    arcs = fct_aux.liste_arcs(mat_GR);
+    matE, dico_arcs_sommets = creer_matE(arcs)
+    path_matrice = Path(chemin_matrice);
+    if not path_matrice.is_dir() :
+        path_matrice.mkdir(parents=True, exist_ok=True)
+    matE.to_csv(chemin_matrice+NOM_MATE_LG, 
+                index_label = INDEX_COL_MATE_LG)
+    return matE, dico_arcs_sommets;
+    
+    
+def creer_reseau(chemin_datasets, chemin_matrices, args):
+    """creation d'un reseau energetique.
+    
+    creer un graphe, ajouter des mesures de puissance sur le graphe puis
+    extraire son line-graphe
+    
+    """
+    if args["dbg"]:
+        chemin_datasets = "dataNewCritereCorrectionGrapheConnu/datasets/";
+        chemin_matrices = "dataNewCritereCorrectionGrapheConnu/matrices/";
+        path_ = Path(chemin_datasets);
+        path_.mkdir(parents=True, exist_ok=True);
+        path_ = Path(chemin_matrices);
+        path_.mkdir(parents=True, exist_ok=True);
+        
+    logger = logging.getLogger('creer_reseau')
+    logger.debug("creation de mat et matE")
+    dico_graphe = {"a":["b"], "b":["c","d"], "c":["e","f"], 
+                   "d":["f"], "e":["g"], "f":["h"], "g":[],
+                   "h":[]};
+                   
+    mat = pd.DataFrame(index = dico_graphe.keys(), columns = dico_graphe.keys());
+    
+    for k, vals in dico_graphe.items():
+        for v in vals:
+            mat.loc[k,v] = 1;
+    mat.fillna(value=0, inplace=True);
+    
+    # ajouter mesures 
+    grandeurs = ["P"];    
+    dico_arcs_sommets = dict()
+    dico_arcs_sommets = nommage_arcs(mat)
+    
+#    genererMesures_all_grandeurs(matA, dico_dual_arc_sommet, liste_grandeurs, location = "data/datasets/", taille = 3, effet_joule = 0):
+
+    mesures.genererMesures_all_grandeurs(mat, dico_arcs_sommets, grandeurs, 
+                                 chemin_datasets, taille=100, effet_joule=0.1)
+
+    
+    #matrice du linegraphe du reseau de flot a determiner
+    arcs = fct_aux.liste_arcs(mat)
+    matE = mesures.creation_matE(dico_arcs_sommets, arcs)
+    matE.to_csv(chemin_matrices+"matE.csv", 
+                index_label = INDEX_COL_MATE_LG)
+    logger.debug("mat cree : arcs={}, sommets={}, matE cree : aretes={}, ".
+                 format(len(arcs), len(dico_graphe.keys()), 
+                            fct_aux.liste_arcs(matE)))
+    return matE, mat, dico_arcs_sommets;
+
+def creer_matE(aretes_mat_GR):
+    """ creer le line graphe a partir des aretes de mat
+    """ 
+    aretes = [];
+    dico_arcs_sommets = dict();
+    
+    for arc in aretes_mat_GR:
+        arete = "";
+        if arc[0] < arc[1]:
+            arete = arc;
+            aretes.append(list(arete))
+        else:
+            arete = (arc[1], arc[0]);
+            aretes.append(list(arete));
+        dico_arcs_sommets["_".join(arete)] = arete;
+    
+    dico_graphe = dict();
+    for tuple_arete in it.combinations(aretes, 2):
+        if set(tuple_arete[0]).intersection(set(tuple_arete[1])) :
+            arete0 = "_".join(sorted(tuple_arete[0]));
+            arete1 = "_".join(sorted(tuple_arete[1]));
+            if arete0 not in dico_graphe and arete1 not in dico_graphe :
+                dico_graphe[arete0] = [arete1];
+            elif arete0 not in dico_graphe and arete1 in dico_graphe :
+                dico_graphe[arete1].append(arete0);
+            elif arete0 in dico_graphe and arete1 not in dico_graphe :
+                dico_graphe[arete0].append(arete1);
+            elif arete0 in dico_graphe and arete1 in dico_graphe :
+                dico_graphe[arete0].append(arete1);
+                
+    matE = pd.DataFrame(index = dico_graphe.keys(), 
+                        columns = dico_graphe.keys());
+    for k, vals in dico_graphe.items():
+        for v in vals:
+            matE.loc[k,v] = 1
+            matE.loc[v,k] = 1
+    matE.fillna(value=0, inplace=True);
+    return matE.astype(int), dico_arcs_sommets;
+
+def generer_reseau(nbre_sommets_GR, 
+                   nbre_moyen_liens,
+                   chemin_dataset,
+                   chemin_matrice,
+                   nbre_ts, epsilon, effet_joule):
+    """ generer un reseau de sommets = dim_mat avec ses mesures de flots.
+    
+        dim_mat : l'ordre du graphe
+        chemin_datasets : chemin pour sauvegarder les mesures de 
+                        grandeurs physiques
+        chemin_matrices : chemin pour sauvegarder les matrices de notre 
+                        reseau cad matrice d'adjacence du linegraphe (matE) 
+                        et son graphe racine (mat)
+        epsilon : 0.75
+        seuil : valeur par defaut definissant une adjacence entre 2 sommets
+        nbre_ts : nombre de time series 
+    """
+    
+    #generer reseau de flots (A DETERMINER) avec mesures 
+    mat = None;
+    mat = geneMatA.genererMatriceA(nbre_sommets_GR, nbre_moyen_liens)
+    dico_arcs_sommets = nommage_arcs(mat)
+    datasets = list();
+    datasets = mesures.create_datasets_new(mat,
+                                           dico_arcs_sommets,
+                                           nbre_ts, effet_joule)
+   
+    path_dataset = Path(chemin_dataset);
+    if not path_dataset.is_dir() :
+        path_dataset.mkdir(parents=True, exist_ok=True)
+    for dfs in datasets :
+        dfs[1].to_csv(chemin_dataset+"dataset_"+dfs[0]+".csv", 
+                        index = False) 
+    
+    #matrice du linegraphe du reseau de flot a determiner
+    arcs = fct_aux.liste_arcs(mat);
+    matE, dico_arcs_sommets = creer_matE(arcs)
+    path_matrice = Path(chemin_matrice);
+    if not path_matrice.is_dir() :
+        path_matrice.mkdir(parents=True, exist_ok=True)
+    matE.to_csv(chemin_matrice + NOM_MATE_LG, 
+                index_label = INDEX_COL_MATE_LG)
+    mat.to_csv(chemin_matrice + NOM_MAT_GR)
+    return matE, mat, dico_arcs_sommets;
+    
+###############################################################################
+#               generation graphes de flots ---> fin
+############################################################################### 
+
+
+###############################################################################
+#   simulation algo de couverture et correction pour k_erreurs = {1,2} ---> debut
+############################################################################### 
+def simulation_algos_k_erreurs_1_2(k_erreur,
+                                   dico_caracteristiques_graphes,
+                                   dico_critere_correction,
+                                   dbg):
+    """
+    simulation des algos de couverture et correction 
+    pour k_erreurs aretes supprimees.
+    
+    """
+    pass
+###############################################################################
+#   simulation algo de couverture et correction pour k_erreurs = {1,2} ---> fin
+############################################################################### 
+
+###############################################################################
+#       creer graphe racine et line graphe selon caracteristiques 
+#                        pour k_erreurs
+#                         -----> debut
+###############################################################################
+def creation_GR_LG_caracteristique_simulation_k_erreurs(
+                                        dico_caracteristiques_graphes,
+                                        dico_critere_correction, 
+                                        dbg) :
+    """
+    creer le graphe racine et line-graphe selon les caracteriques voulues de 
+    simulation pour k_erreurs.
+    GR = Graphe Racine,
+    LG = Line-Graphe
+    
+    JE BUG POUR LE CAS GENERAL CAD UTILISATION DES GRAPHES GENERES PARFAITS 
+    POUR APPLIQUER LES K_ERREURS DANS CES GRAPHES.
+    
+    """
+    for caract in it.product(
+                    dico_critere_correction["criteres_selection_compression"], 
+                    dico_critere_correction["modes_correction"], 
+                    dico_critere_correction["p_correls"],
+                    range(1, dico_caracteristiques_graphes["NBRE_GRAPHES"]+1, 1),
+                    dico_critere_correction["k_erreurs"]):
+        rep_base = dico_caracteristiques_graphes["rep_data"] + "/" + \
+                    caract[0] + "/" + \
+                    caract[1] + "/" + \
+                    "data_p_" + str(caract[2]) + "/" + \
+                    "G_" + str(caract[3]) + "_" + \
+                    str(caract[4]) + "/";
+#        rep_save_graphe = dico_caracteristiques_graphes["rep_data"] + "/" + \
+#                            "graphes" + "/" + \
+#                            "G_" + str(caract[4]) + "/";
+
+        chemin_dataset = rep_base + "datasets"+ "/";
+        chemin_matrice = rep_base + "matrices"+ "/";
+        mat_LG, mat_GR, dico_arcs_sommets = \
+                    generer_reseau(
+                            dico_caracteristiques_graphes["nbre_sommets_GR"], 
+                            dico_caracteristiques_graphes["nbre_moyen_liens"],
+                            chemin_dataset,
+                            chemin_matrice, 
+                            dico_caracteristiques_graphes["nbre_ts"], 
+                            dico_caracteristiques_graphes["epsilon"], 
+                            dico_caracteristiques_graphes["effet_joule"])
+        graphes_GR_LG.append( (mat_LG, mat_GR, dico_arcs_sommets, 
+                               caract, chemin_dataset, chemin_matrice) )
+    
+    print("k_erreurs => nbre de tuples de graphes_GR_LG = {}".format(
+          len(graphes_GR_LG)))
+    return graphes_GR_LG;
+###############################################################################
+#       creer graphe racine et line graphe selon caracteristiques 
+#                        pour k_erreurs
+#                         -----> fin
+###############################################################################
+
+###############################################################################
+#       creer graphe racine et line graphe selon caracteristiques 
+#                        pour k_erreur = 1, 2
+#                           -----> debut
+###############################################################################
+def creation_GR_LG_caracteristique_simulation_k_1_2(
+                            dico_caracteristiques_graphes,
+                            dico_critere_correction, 
+                            k_erreur, 
+                            dbg) :
+    """
+    creer le graphe racine et line-graphe selon les caracteriques voulues de 
+    simulation pour k_erreur = {1, 2}.
+    GR = Graphe Racine,
+    LG = Line-Graphe
+    
+    caract_tuple = (critere, mode, p_correl, num_graphe, k_erreur)
+    
+    """
+    #suppression de repertoire criteres_selection_compression
+    reps_a_del = [dico_caracteristiques_graphes["rep_data"] + "/" + rep_crit 
+                  for rep_crit in \
+                  dico_critere_correction["criteres_selection_compression"]]
+    for rep_a_del in reps_a_del:
+        if os.path.isdir(rep_a_del) :
+            subprocess.Popen(['rm', '-rf', rep_a_del])
+
+    
+    graphes_GR_LG = list();
+    for num_graphe in range(1, dico_caracteristiques_graphes["NBRE_GRAPHES"]+1):
+        rep_save_graphe = dico_caracteristiques_graphes["rep_data"] + "/" + \
+                            "graphes_sommets_GR_" + \
+                            str(dico_caracteristiques_graphes["nbre_sommets_GR"]) +"/" + \
+                            "G" + "_" + str(num_graphe) + "/";
+        chemin_dataset = rep_save_graphe + "datasets"+ "/";
+        chemin_matrice = rep_save_graphe + "matrices"+ "/";
+        
+        print("\n \n graphe G_{}".format(num_graphe));
+        if dbg :
+            print("EXIST matE = {},\n EXIST mat_GR = {}".format(
+                  os.path.exists(chemin_matrice + NOM_MATE_LG),
+                  os.path.exists(chemin_matrice + NOM_MAT_GR)))
+        
+        matE_LG, mat_GR, dico_arcs_sommets = None, None, None;
+        if not os.path.exists(chemin_matrice + NOM_MATE_LG) or \
+            not os.path.exists(chemin_matrice + NOM_MAT_GR) :
+            print("1 graph not exists") if dbg else None;
+            matE_LG, mat_GR, dico_arcs_sommets = \
+                        generer_reseau(
+                            dico_caracteristiques_graphes["nbre_sommets_GR"], 
+                            dico_caracteristiques_graphes["nbre_moyen_liens"],
+                            chemin_dataset,
+                            chemin_matrice, 
+                            dico_caracteristiques_graphes["nbre_ts"], 
+                            dico_caracteristiques_graphes["epsilon"], 
+                            dico_caracteristiques_graphes["effet_joule"]
+                            )
+        else :
+            print("2 graph exists") if dbg else None;
+            matE_LG = pd.read_csv(chemin_matrice + NOM_MATE_LG, 
+                                  index_col = INDEX_COL_MATE_LG);
+            mat_GR = pd.read_csv(chemin_matrice + NOM_MAT_GR, 
+                                 index_col = INDEX_COL_MAT_GR);
+            dico_arcs_sommets = nommage_aretes(mat_GR);
+                        
+        cliques_couvertures, aretes_res, etat_noeuds = \
+                                    algoCouverture.couverture_cliques(
+                                            matE_LG, 
+                                            mat_GR, 
+                                            dico_arcs_sommets, 
+    #                                          caract_correction, 
+                                            chemin_dataset, 
+                                            chemin_matrice,
+                                            dbg)
+        if len(cliques_couvertures) == \
+                        dico_caracteristiques_graphes["nbre_sommets_GR"] and \
+            len(aretes_res) == 0 and \
+            -1 not in etat_noeuds.values() :
+            for caract_tuple in it.product(
+                                dico_critere_correction["criteres_selection_compression"], 
+                                dico_critere_correction["modes_correction"], 
+                                dico_critere_correction["p_correls"],
+                                [num_graphe],
+                                [k_erreur]
+                                ):
+                rep_base = dico_caracteristiques_graphes["rep_data"] + "/" + \
+                            caract_tuple[0] + "_sommets_GR_" + \
+                            str(dico_caracteristiques_graphes["nbre_sommets_GR"]) + "/" + \
+                            caract_tuple[1] + "/" + \
+                            "data_p_" + str(caract_tuple[2]) + "/" + \
+                            "G_" + str(caract_tuple[3]) + "_" + \
+                            str(caract_tuple[4]) + "/";
+
+                chemin_dataset = rep_base + "datasets"+ "/";
+                path = Path(chemin_dataset);path.mkdir(parents=True, exist_ok=True);
+                chemin_matrice = rep_base + "matrices"+ "/";
+                path = Path(chemin_matrice);path.mkdir(parents=True, exist_ok=True);
+                
+                matE_LG.to_csv(chemin_matrice + NOM_MATE_LG, 
+                               index_label = INDEX_COL_MATE_LG)
+                mat_GR.to_csv(chemin_matrice + NOM_MAT_GR)
+                
+                graphes_GR_LG.append( (matE_LG, mat_GR, dico_arcs_sommets, 
+                               caract_tuple, chemin_dataset, chemin_matrice) )
+        
+    print("k_erreur => nbre de tuples de graphes_GR_LG = {}".format(
+          len(graphes_GR_LG)))
+    return graphes_GR_LG;
+                                    
+###############################################################################
+#       creer graphe racine et line graphe selon caracteristiques 
+#                        pour k_erreur = 1, 2
+#                           -----> fin
+###############################################################################
+
+
+if __name__ == '__main__':
+    ti = time.time();
+    
+    NBRE_GRAPHES = 10;
+    rep_data = "data_test"
+    bool_test = True;
+    bool_test_k_1_2 = True;
+    dbg = False#True;
+    
+    
+    # caracteristiques graphes racines
+    nbre_sommets_GR = 5;
+    nbre_moyen_liens = (2,5);
+    epsilon = 0.75; effet_joule = 0;
+    nbre_ts = 10;
+    grandeurs = ["P"]; #["I","U","P"];
+    
+    # nombres et types de corrections
+    k_erreurs_min = 0;
+    k_erreurs_max = 2;
+    step_range_k_erreur = 1;
+    k_erreurs = range(k_erreurs_min,
+                      k_erreurs_max,
+                      step_range_k_erreur)
+    p_correl_max = 1; 
+    p_correl_min = 0;
+    step_range_p = 0.1;
+    modes_correction = ["aleatoire_sans_remise", 
+                         "degre_min_sans_remise", 
+                         "cout_min_sans_remise", 
+                         "aleatoire_avec_remise", 
+                         "degre_min_avec_remise", 
+                         "cout_min_avec_remise"]
+    criteres_selection_compression = ["voisins_corriges", 
+                                       "nombre_aretes_corrigees", 
+                                       "voisins_nombre_aretes_corrigees"];
+    p_correls = np.arange(p_correl_min, p_correl_max, step_range_p);
+    if bool_test:
+        k_erreurs = range(k_erreurs_min, 1,1)
+        modes_correction = ["aleatoire_sans_remise"]
+        criteres_selection_compression = ["voisins_corriges"]
+        p_correls = [0.5];
+    
+    # dictionaires 
+    dico_caracteristiques_graphes = {"NBRE_GRAPHES" : NBRE_GRAPHES,
+                                     "rep_data" : rep_data,
+                                     "nbre_sommets_GR" : nbre_sommets_GR,
+                                     "nbre_moyen_liens" : nbre_moyen_liens,
+                                     "epsilon" : epsilon, 
+                                     "effet_joule" : effet_joule,
+                                     "nbre_ts" : nbre_ts,
+                                     "grandeurs" :grandeurs
+                                     }
+    dico_critere_correction = {"k_erreurs" : k_erreurs,
+                               "modes_correction" : modes_correction,
+                               "p_correls" : p_correls,
+                               "criteres_selection_compression" : criteres_selection_compression,
+                               }    
+    k_erreur = 1;
+    
+    # creation de graphes racines GR et de line-graphes LG
+    graphes_GR_LG = list();
+    if not bool_test_k_1_2 :
+        graphes_GR_LG = \
+            creation_GR_LG_caracteristique_simulation_k_erreurs(
+                                        dico_caracteristiques_graphes,
+                                        dico_critere_correction, 
+                                        dbg);
+    else :
+        graphes_GR_LG = \
+            creation_GR_LG_caracteristique_simulation_k_1_2(
+                            dico_caracteristiques_graphes,
+                            dico_critere_correction, 
+                            k_erreur, 
+                            dbg);
+    
+        
+    # partitionnement en cliques de LG
+#    p = Pool(mp.cpu_count()-1) 
+#    p.starmap(algoCouverture.couverture_cliques, graphes_GR_LG)
+#    p.terminate()
+    print("runtime = {}".format(time.time() - ti))
+    pass
