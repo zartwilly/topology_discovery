@@ -6,6 +6,9 @@ Created on Fri Jan 11 12:56:11 2019
 @author: willy
 """
 import itertools as it;
+import pandas as pd;
+import time;
+
 
 def voisins(liste_arcs, noeud):
     """
@@ -102,3 +105,208 @@ def get_intersection(s):
     for x in s[1:]:
         i = i & set(x)
     return i
+    
+    
+def cliques_couvrants_sommets(cliques_couvertures, sommets_matE_LG):
+    """
+    determine les cliques couvrants les sommets de LG.
+    
+    """
+    sommets_couverts_cliques = dict();
+    for clique in cliques_couvertures:
+        for sommet in clique:
+            if sommet not in sommets_couverts_cliques.keys():
+                sommets_couverts_cliques[sommet] = [clique];
+            else:
+                sommets_couverts_cliques[sommet].append(clique);
+    sommets_not_couverts_cliques = set(sommets_matE_LG) - \
+                                    set(sommets_couverts_cliques.keys())
+    for sommet in sommets_not_couverts_cliques:
+        sommets_couverts_cliques[sommet] = [];
+    return sommets_couverts_cliques;
+    
+def aretes_dans_cliques(cliques_couvertures):
+    """ retourne les aretes de tous les cliques. """
+    aretes_cliques = list();
+    
+    boolean_subset = False;
+    for clique in cliques_couvertures:
+        if isinstance(clique, list) or \
+            isinstance(clique, set) or \
+            isinstance(clique, frozenset) :
+            boolean_subset = True
+            
+    if boolean_subset :
+        aretes_cliques = [frozenset(item) for sublist in [list(it.combinations(clique,2)) 
+                                            for clique in cliques_couvertures] 
+                        for item in sublist]
+    else:
+        aretes_cliques = list(it.combinations(cliques_couvertures,2));
+    return aretes_cliques
+    
+    
+def comparer_cliques(C, C_old):
+    """ 
+    retourne les cliques differentes et identiques entre C et C_old.
+    
+    """
+    C_old = set(map(frozenset, C_old))
+    cliques_identiques = set();
+    cliques_differentes = set();
+            
+    cliques_identiques = C.intersection(C_old);
+    cliques_differentes = C.union(C_old)- C.intersection(C_old);
+    
+    return cliques_identiques, cliques_differentes;
+        
+def is_locked(filepath, df, G_k):
+    """
+    Checks if a file is locked by opening it in append mode.
+    If no exception thrown, then the file is not locked.
+    
+    """
+    locked = None
+    file_object = None
+    
+    try:
+        print("Trying to open {} resumeExecution.".format(G_k))
+        buffer_size = 8
+        # Opening file in append mode and read the first 8 characters.
+        file_object = open(filepath, 'a', buffer_size)
+        if file_object:
+            df_resExec = pd.read_csv(filepath, sep = ",");
+            print("open ")
+            # merger df_resExec et df en gardant les index (fusionner leur index)
+            df_resExec = pd.merge(df_resExec, df, on="index", how="outer");
+            df_resExec.to_csv(filepath, sep=',', index=False);
+            print("sauve {}".format(G_k))
+            locked = False;
+    except IOError as message:
+        print("resumeExecution_{}.csv is not locked ({}).".format( \
+                  G_k.split("_")[2], message ))
+        locked = True;
+    finally:
+        if file_object:
+            file_object.close();
+            print("resumeExecution_{}.csv  closed.".format( \
+                  G_k.split("_")[2]))
+    print("locked={}".format(locked))
+    return locked;
+    
+def sauver_df_resume(df, name_save_df, G_k):
+    """ 
+    sauvegarder le dataframe contenant la colonne G_numeroGraphe_k 
+    dans le dataframe generale 
+    resumeExecution.csv
+    
+    df : contient une seule colonne "G_numeroGrapke_k"
+    """
+    # open file
+    # verifier si ce fichier nest pas ouvert par un autre fichier
+    #   si oui attendre
+    #   sinon enregistrer.
+    my_file = Path(name_save_df);
+    
+    print("sauver ")
+    temps_attente = 0.010;                                                      # attente de 10 ms
+    if my_file.is_file():
+        while is_locked(name_save_df, df, G_k):
+            print("reseumeExecution_{} is currently in use. Waiting {} milliseconds.".\
+                  format((G_k.split("_")[2], temps_attente)))
+            time.sleep(temps_attente);
+    else:
+        print("sauve :)")
+        df.to_csv(name_save_df, sep=',', index=False);
+    print("sauver fin")
+    
+    
+    
+def sauver_info_execution_dico_df(bool_erreur, 
+                        G_k, k_erreur, alpha_, nbre_sommets_matE_LG, 
+                        nbre_aretes_LG, 
+                        aretes_modifiees_alpha,
+                        sommets_couverts_cliques,
+                        dc = "error", dh = "error", 
+                        nbre_aretes_diff_dc = "error", 
+                        nbre_aretes_diff_dh = "error",
+                        nbre_cliques_couvertures = "error", 
+                        nbre_cliques_couvertures_apres_correct = "error",
+                        nbre_cliques_idents_avant_apres_correct = "error",
+                        nbre_cliques_diffs_avant_apres_correct = "error",
+                        dico_solution = "error"
+                        ):
+    """
+    enregistrer dans un dico_df certains infos de l'execution de nos algos.
+    
+    """
+    dico_df = dict();
+    for sommet, cliques in sommets_couverts_cliques.items():
+                dico_df[str(sommet)] = len(cliques);
+    if bool_erreur :
+        dico_df["G_k"] = G_k; 
+        dico_df["k_erreur"] = k_erreur; 
+        dico_df["alpha"] = alpha_;
+        dico_df["nbre_sommets_matE_LG"] = nbre_sommets_matE_LG,
+        dico_df["aretes_LG"] = nbre_aretes_LG; 
+        dico_df["aretes_ajoutees"] = aretes_modifiees_alpha["aretes_ajoutees"]; 
+        dico_df["aretes_supprimees"] = aretes_modifiees_alpha["aretes_supprimees"]; 
+        dico_df["dc"] = dc; 
+        dico_df["dh"] = dh; 
+        dico_df["aretes_diff_dc"] = nbre_aretes_diff_dc; 
+        dico_df["aretes_diff_dh"] = nbre_aretes_diff_dh;
+        dico_df["cliques_couvertures"] = nbre_cliques_couvertures; 
+        dico_df["cliques_couvertures_apres_correct"] = \
+                                    nbre_cliques_couvertures_apres_correct;
+        dico_df["cliques_idents_avant_apres_correct"] = \
+                                    nbre_cliques_idents_avant_apres_correct;
+        dico_df["cliques_diffs_avant_apres_correct"] = \
+                                    nbre_cliques_diffs_avant_apres_correct; 
+
+        for cpt_sommet, value in dico_solution.items():
+            dico_df["etape_"+str(cpt_sommet[0])+"_sommet_1"] = \
+                                cpt_sommet[1]
+            dico_df["etape_"+str(cpt_sommet[0])+"_sommets_corriges"] = \
+                                len(value["sommets_corriges"])
+                                
+            dico_df["etape_"+str(cpt_sommet[0])+"_nbre_aretes_ajoutees_p1"]=\
+                                len(value["cout_T"]["aretes_ajoutees_p1"])
+            dico_df["etape_"+str(cpt_sommet[0])+"_aretes_ajoutees_p1"] = \
+                                value["cout_T"]["aretes_ajoutees_p1"]
+            dico_df["etape_"+str(cpt_sommet[0])+"_aretes_p1"] = \
+                            list(it.combinations(value["compression_p1"],2))
+                                
+            dico_df["etape_"+str(cpt_sommet[0])+"_aretes_ajoutees_p2"] = \
+                                value["cout_T"]["aretes_ajoutees_p2"]
+            dico_df["etape_"+str(cpt_sommet[0])+"_nbre_aretes_ajoutees_p2"]=\
+                                len(value["cout_T"]["aretes_ajoutees_p2"])
+            dico_df["etape_"+str(cpt_sommet[0])+"_aretes_p2"] = \
+                            list(it.combinations(value["compression_p2"],2))
+                                
+            dico_df["etape_"+str(cpt_sommet[0])+"_aretes_supprimees"] = \
+                                value["cout_T"]["aretes_supprimees"]
+            dico_df["etape_"+str(cpt_sommet[0])+"_nbre_aretes_supprimes"] = \
+                                len(value["cout_T"]["aretes_supprimees"])
+                                
+            dico_df["etape_"+str(cpt_sommet[0])+"_min_c1"] = \
+                                value["cout_T"]["min_c1"]
+            dico_df["etape_"+str(cpt_sommet[0])+"_max_c2"] = \
+                                value["cout_T"]["max_c2"]
+    else:
+        dico_df["G_k"] = G_k; 
+        dico_df["k_erreur"] = k_erreur; 
+        dico_df["alpha"] = alpha_;
+        dico_df["nbre_sommets_matE_LG"] = nbre_sommets_matE_LG,
+        dico_df["aretes_LG"] = nbre_aretes_LG; 
+        dico_df["aretes_ajoutees"] = aretes_modifiees_alpha["aretes_ajoutees"]; 
+        dico_df["aretes_supprimees"] = aretes_modifiees_alpha["aretes_supprimees"]; 
+        dico_df["dc"] = dc; 
+        dico_df["dh"] = dh; 
+        dico_df["aretes_diff_dc"] = nbre_aretes_diff_dc; 
+        dico_df["aretes_diff_dh"] = nbre_aretes_diff_dh;
+        dico_df["cliques_couvertures"] = nbre_cliques_couvertures; 
+        dico_df["cliques_couvertures_apres_correct"] = \
+                                    nbre_cliques_couvertures_apres_correct;
+        dico_df["cliques_idents_avant_apres_correct"] = \
+                                    nbre_cliques_idents_avant_apres_correct;
+        dico_df["cliques_diffs_avant_apres_correct"] = \
+                                    nbre_cliques_diffs_avant_apres_correct;
