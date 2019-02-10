@@ -37,8 +37,194 @@ from multiprocessing import Pool;
 INDEX_COL_MATE_LG = "Unnamed: 0";
 INDEX_COL_MAT_GR = "nodes";
 NOM_MATE_LG = "matE_generer.csv";
-NOM_MAT_GR = "mat_generer.csv"
+NOM_MAT_GR = "mat_generer.csv";
+
 ###############################################################################
+#                   modification du graphes      ---> debut
+###############################################################################
+def distance_hamming(matE_LG, matE_LG_k):
+    """
+    identifier les aretes differentes entre matE_LG et matE_LG_k
+    matE_LG     peut etre   aretes_LG
+    matE_LG_k   peut etre   aretes_LG_k
+    
+    """
+    aretes_diff = set()
+    if isinstance(matE_LG, pd.DataFrame) and isinstance(matE_LG_k, pd.DataFrame) :
+        aretes_LG = fct_aux.liste_aretes(matE_LG);
+        aretes_LG_k = fct_aux.liste_aretes(matE_LG_k);
+        
+        aretes_ajoutees_a_LG = set(aretes_LG).union(set(aretes_LG_k)) - \
+                                    set(aretes_LG)
+        aretes_supprimees_a_LG_k = set(aretes_LG).union(set(aretes_LG_k)) - \
+                                set(aretes_LG_k)
+        aretes_diff = aretes_ajoutees_a_LG.union(aretes_supprimees_a_LG_k)
+        
+    elif isinstance(matE_LG, list) and isinstance(matE_LG_k, list) :
+        aretes_ajoutees_a_LG = set(matE_LG).union(set(matE_LG_k)) - \
+                                    set(matE_LG)
+        aretes_supprimees_a_LG_k = set(matE_LG).union(set(matE_LG_k)) - \
+                                set(matE_LG_k)
+        aretes_diff = aretes_ajoutees_a_LG.union(aretes_supprimees_a_LG_k)
+                    
+    return aretes_diff;
+    
+def suppression_ajout_aretes(matE_LG, 
+                             aretes_LG, 
+                             aretes_not_LG, 
+                             nbre_k_erreur, 
+                             p_correl,
+                             ajout_del):
+    """
+    suppression ou ajout de nbre_k_erreur aretes dans matE_LG;
+    si ajout_del = 0 ===> ajout
+    si ajout_del = 1 ===> suppression
+    si ajout_del = 2 ===> ajout et supprime selon p_correl
+    """
+    # choisir k_erreurs aretes aleatoirement ds aretes_LG
+    # mettre ces aretes de matE_LG a 0
+    # retourner matE_LG et aretes_LG
+    matE_LG_k, aretes_LG_k = matE_LG.copy(), aretes_LG.copy();
+    aretes_not_LG_k = aretes_not_LG.copy();
+    aretes_modifiees = {"aretes_supprimees":[], "aretes_ajoutees":[]};
+    if ajout_del == 1 :
+        for _ in range(0, nbre_k_erreur) :
+            id_arete,arete = random.choice(list(enumerate(aretes_LG_k)))
+            aretes_LG_k.pop(id_arete);
+            arete_ = list(arete)
+            matE_LG_k.loc[arete_[0], arete_[1]] = 0;
+            matE_LG_k.loc[arete_[1], arete_[0]] = 0;
+            aretes_modifiees["aretes_supprimees"].append(arete)
+    elif ajout_del == 0 :
+        for _ in range(0, nbre_k_erreur) :
+            id_not_arete,not_arete = random.choice(list(enumerate(aretes_not_LG_k)))
+            aretes_not_LG_k.pop(id_not_arete);
+            aretes_LG_k.append(not_arete);
+            not_arete_ = list(not_arete)
+            matE_LG_k.loc[not_arete_[0], not_arete_[1]] = 1;
+            matE_LG_k.loc[not_arete_[1], not_arete_[0]] = 1;
+            aretes_modifiees["aretes_ajoutees"].append(not_arete)
+    elif ajout_del == 2 :
+        nbre_aretes_a_ajouter = 0;
+        nbre_aretes_a_supprimer = 0;
+        nbre_aretes_a_ajouter = math.ceil(nbre_k_erreur * p_correl);
+        nbre_aretes_a_supprimer = nbre_k_erreur - math.ceil(nbre_k_erreur *\
+                                                            p_correl);
+        
+        aretes_LG_k_tmp = list()
+        for _ in range(0, nbre_aretes_a_ajouter) :
+            id_not_arete, not_arete = random.choice(list(
+                                                    enumerate(aretes_not_LG_k))
+                                                    )
+            aretes_not_LG_k.pop(id_not_arete)
+            aretes_LG_k_tmp.append(not_arete);
+            not_arete_ = list(not_arete);
+            matE_LG_k.loc[not_arete_[0], not_arete_[1]] = 1;
+            matE_LG_k.loc[not_arete_[1], not_arete_[0]] = 1;
+            aretes_modifiees["aretes_ajoutees"].append(not_arete);
+        for _ in range(0, nbre_aretes_a_supprimer) :
+            id_arete, arete = random.choice(list(enumerate(aretes_LG_k)))
+            aretes_LG_k.pop(id_arete);
+            arete_ = list(arete);
+            matE_LG_k.loc[arete_[0], arete_[1]] = 0;
+            matE_LG_k.loc[arete_[1], arete_[0]] = 0;
+            aretes_modifiees["aretes_supprimees"].append(arete);
+        aretes_LG_k = aretes_LG_k + aretes_LG_k_tmp;
+        
+    else :
+        print("AUCUNE ACTION DE MODIF (suppression ou ajout) CHOISIE ....")
+        matE_LG_k = matE_LG.copy();
+        aretes_LG_k = aretes_LG.copy();
+        
+    return matE_LG_k, aretes_LG_k, aretes_modifiees;
+    
+def test_suppression_ajout_aretes(graphes_GR_LG):
+    """
+    test de la fonction suppression_ajout_aretes 
+    sur les graphes generees graphes_GR_LG;
+    graphe_GR_LG = (matE_LG, mat_GR, dico_arcs_sommets, \
+                    caract_tuple, chemin_dataset, chemin_matrice)
+    caract_tuple = (critere, mode, p_correl, num_graphe, k_erreur)
+    
+    """
+    dico_df = dict()
+    for graphe_GR_LG in graphes_GR_LG :
+        matE_LG = graphe_GR_LG[0];
+        num_graphe = graphe_GR_LG[3][3];
+        p_correl = graphe_GR_LG[3][2];
+        nbre_k_erreur = graphe_GR_LG[3][4];
+
+        dico = dict()
+        dico["nbre_k_erreur"] = nbre_k_erreur;
+        dico["p_correl"]  = p_correl;
+        for ajout_del in [0, 1, 2]:
+            aretes_LG = fct_aux.liste_aretes(matE_LG);
+            aretes_not_LG = fct_aux.liste_not_aretes(matE_LG);
+            matE_LG_k, aretes_LG_k, aretes_modifiees = None, list(), dict();
+            matE_LG_k, aretes_LG_k, aretes_modifiees = \
+                                suppression_ajout_aretes(matE_LG.copy(), 
+                                                         aretes_LG.copy(), 
+                                                         aretes_not_LG.copy(), 
+                                                         nbre_k_erreur, 
+                                                         p_correl,
+                                                         ajout_del
+                                                         )
+                                
+            dist_ham = distance_hamming(matE_LG, matE_LG_k);
+            aretes_modifiees_cal = set()           
+            
+            aretes_ajoutees_a_LG = set(aretes_LG).union(set(aretes_LG_k)) - \
+                                    set(aretes_LG)
+            aretes_supprimees_a_LG_k = set(aretes_LG).union(set(aretes_LG_k)) - \
+                                    set(aretes_LG_k)
+            aretes_modifiees_cal = aretes_ajoutees_a_LG.union(aretes_supprimees_a_LG_k)
+
+                           
+            if ajout_del == 0 :
+                aretes_ajoutees = aretes_modifiees["aretes_ajoutees"]
+                if len(set(aretes_ajoutees).\
+                       intersection(aretes_modifiees_cal) ) == nbre_k_erreur :
+                    dico["aretes_ajoutees_0"] = "OK";
+                else:
+                    dico["aretes_ajoutees_0"] = "NOK";
+                dico["dist_ham_"+str(ajout_del)] = len(dist_ham);
+                dico["aretes_modifiees_cal_"+str(ajout_del)] = len(aretes_modifiees_cal)
+                dico["aretes_ajoutees_a_LG_"+str(ajout_del)] = len(aretes_ajoutees_a_LG)
+                dico["aretes_supprimees_a_LG_k_"+str(ajout_del)] = len(aretes_supprimees_a_LG_k)
+                
+            elif ajout_del == 1 :
+                aretes_supprimees = aretes_modifiees["aretes_supprimees"]
+                if len(set(aretes_supprimees).\
+                       intersection(aretes_modifiees_cal) ) == nbre_k_erreur :
+                    dico["aretes_supprimees_1"] = "OK";
+                else:
+                    dico["aretes_supprimees_1"] = "NOK";
+                dico["dist_ham_"+str(ajout_del)] = len(dist_ham);
+                dico["aretes_modifiees_cal_"+str(ajout_del)] = len(aretes_modifiees_cal)
+                dico["aretes_ajoutees_a_LG_"+str(ajout_del)] = len(aretes_ajoutees_a_LG)
+                dico["aretes_supprimees_a_LG_k_"+str(ajout_del)] = len(aretes_supprimees_a_LG_k)
+
+            elif ajout_del == 2 :
+                aretes_ajoutees = aretes_modifiees["aretes_ajoutees"] 
+                aretes_supprimees = aretes_modifiees["aretes_supprimees"]
+                aretes_modifs = aretes_ajoutees + aretes_supprimees;
+                if len(set(aretes_modifs).\
+                       intersection(aretes_modifiees_cal) ) == nbre_k_erreur :
+                    dico["aretes_modifs_2"] = "OK";
+                else:
+                    dico["aretes_modifs_2"] = "NOK";
+                dico["dist_ham_"+str(ajout_del)] = len(dist_ham);
+                dico["aretes_modifiees_cal_"+str(ajout_del)] = len(aretes_modifiees_cal)
+                dico["aretes_ajoutees_a_LG_"+str(ajout_del)] = len(aretes_ajoutees_a_LG)
+                dico["aretes_supprimees_a_LG_k_"+str(ajout_del)] = len(aretes_supprimees_a_LG_k)
+
+        dico_df[num_graphe] = dico;
+
+    df_test_supp_k_aretes = pd.DataFrame.from_dict(dico_df);
+    return df_test_supp_k_aretes;
+        
+###############################################################################
+#                   modification du graphes      ---> fin
 ###############################################################################
 
 
@@ -520,6 +706,7 @@ if __name__ == '__main__':
     rep_data = "data_test"
     bool_test = True;
     bool_test_k_1_2 = True;
+    bool_test_functions = True
     dbg = False#True;
     
     
@@ -531,6 +718,7 @@ if __name__ == '__main__':
     grandeurs = ["P"]; #["I","U","P"];
     
     # nombres et types de corrections
+    k_erreur = 5 # 1
     k_erreurs_min = 0;
     k_erreurs_max = 2;
     step_range_k_erreur = 1;
@@ -571,7 +759,7 @@ if __name__ == '__main__':
                                "p_correls" : p_correls,
                                "criteres_selection_compression" : criteres_selection_compression,
                                }    
-    k_erreur = 1;
+#    k_erreur = 1;
     
     # creation de graphes racines GR et de line-graphes LG
     graphes_GR_LG = list();
@@ -589,7 +777,8 @@ if __name__ == '__main__':
                             k_erreur, 
                             dbg);
     
-        
+    if bool_test_functions :
+        df_test_supp_aretes = test_suppression_ajout_aretes(graphes_GR_LG);
     # partitionnement en cliques de LG
 #    p = Pool(mp.cpu_count()-1) 
 #    p.starmap(algoCouverture.couverture_cliques, graphes_GR_LG)

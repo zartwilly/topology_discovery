@@ -58,6 +58,21 @@ def liste_aretes(mat):#, dico_arcs_sommets):
             res.append( frozenset(arete));
     return res;
     
+def liste_not_aretes(mat):#, dico_arcs_sommets):
+    """ retourne la liste des aretes d'un graphe. """
+    res = list();
+    if type(mat) not in [set, list, dict]:
+        for row, col in range_2d(mat.columns.tolist()):
+            if mat.loc[row,col] == 0 or mat.loc[col,row] == 0:
+                res.append( frozenset((row, col)) );
+    else:
+#        FAUX
+#        for arete in it.combinations(mat,2):
+##            res.append( set(arete));           # commenter a cause de ligne 217 algo_couverture (aretes = fct_aux.liste_aretes(matE_LG);)
+#            res.append( frozenset(arete));
+        pass
+    return res;
+    
 def gamma(matE):    
     """
     but: determine les voisins de chaque sommet.
