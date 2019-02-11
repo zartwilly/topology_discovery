@@ -310,3 +310,5 @@ def sauver_info_execution_dico_df(bool_erreur,
                                     nbre_cliques_idents_avant_apres_correct;
         dico_df["cliques_diffs_avant_apres_correct"] = \
                                     nbre_cliques_diffs_avant_apres_correct;
+                                    
+    return dico_df;
