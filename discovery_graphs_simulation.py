@@ -29,7 +29,7 @@ import genererMatA as geneMatA;
 import fonctions_auxiliaires as fct_aux;
 import generations_mesures as mesures;
 import algo_couverture as algoCouverture;
-#import algo_correction as algoCorrection;
+import algo_correction as algoCorrection;
 
 from pathlib import Path    # http://stackoverflow.com/questions/6004073/how-can-i-create-directories-recursively
 from multiprocessing import Pool;
