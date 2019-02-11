@@ -5,10 +5,11 @@ Created on Fri Jan 11 12:56:11 2019
 
 @author: willy
 """
+
+import time;
 import itertools as it;
 import pandas as pd;
-import time;
-
+from pathlib import Path 
 
 def voisins(liste_arcs, noeud):
     """
@@ -224,6 +225,7 @@ def sauver_df_resume(df, name_save_df, G_k):
 def sauver_info_execution_dico_df(bool_erreur, 
                         G_k, k_erreur, alpha_, nbre_sommets_matE_LG, 
                         nbre_aretes_LG, 
+                        nbre_aretes_LG_k_alpha,
                         aretes_modifiees_alpha,
                         sommets_couverts_cliques,
                         dc = "error", dh = "error", 
@@ -241,13 +243,15 @@ def sauver_info_execution_dico_df(bool_erreur,
     """
     dico_df = dict();
     for sommet, cliques in sommets_couverts_cliques.items():
-                dico_df[str(sommet)] = len(cliques);
+        dico_df[str(sommet)] = len(cliques);
+        
     if bool_erreur :
         dico_df["G_k"] = G_k; 
         dico_df["k_erreur"] = k_erreur; 
         dico_df["alpha"] = alpha_;
         dico_df["nbre_sommets_matE_LG"] = nbre_sommets_matE_LG,
         dico_df["aretes_LG"] = nbre_aretes_LG; 
+        dico_df["aretes_LG_k_alpha"] = nbre_aretes_LG_k_alpha; 
         dico_df["aretes_ajoutees"] = aretes_modifiees_alpha["aretes_ajoutees"]; 
         dico_df["aretes_supprimees"] = aretes_modifiees_alpha["aretes_supprimees"]; 
         dico_df["dc"] = dc; 
@@ -297,6 +301,7 @@ def sauver_info_execution_dico_df(bool_erreur,
         dico_df["alpha"] = alpha_;
         dico_df["nbre_sommets_matE_LG"] = nbre_sommets_matE_LG,
         dico_df["aretes_LG"] = nbre_aretes_LG; 
+        dico_df["aretes_LG_k_alpha"] = nbre_aretes_LG_k_alpha; 
         dico_df["aretes_ajoutees"] = aretes_modifiees_alpha["aretes_ajoutees"]; 
         dico_df["aretes_supprimees"] = aretes_modifiees_alpha["aretes_supprimees"]; 
         dico_df["dc"] = dc; 
