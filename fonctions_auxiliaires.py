@@ -227,15 +227,16 @@ def sauver_info_execution_dico_df(bool_erreur,
                         nbre_aretes_LG, 
                         nbre_aretes_LG_k_alpha,
                         aretes_modifiees_alpha,
-                        sommets_couverts_cliques,
+                        sommets_couverts_cliques = {},
                         dc = "error", dh = "error", 
+                        etats_noeuds_1 = "error",
                         nbre_aretes_diff_dc = "error", 
                         nbre_aretes_diff_dh = "error",
                         nbre_cliques_couvertures = "error", 
                         nbre_cliques_couvertures_apres_correct = "error",
                         nbre_cliques_idents_avant_apres_correct = "error",
                         nbre_cliques_diffs_avant_apres_correct = "error",
-                        dico_solution = "error"
+                        dico_solution = {}
                         ):
     """
     enregistrer dans un dico_df certains infos de l'execution de nos algos.
@@ -253,9 +254,10 @@ def sauver_info_execution_dico_df(bool_erreur,
         dico_df["aretes_LG"] = nbre_aretes_LG; 
         dico_df["aretes_LG_k_alpha"] = nbre_aretes_LG_k_alpha; 
         dico_df["aretes_ajoutees"] = aretes_modifiees_alpha["aretes_ajoutees"]; 
-        dico_df["aretes_supprimees"] = aretes_modifiees_alpha["aretes_supprimees"]; 
+        dico_df["aretes_supprimees"] = aretes_modifiees_alpha["aretes_supprimees"];
         dico_df["dc"] = dc; 
         dico_df["dh"] = dh; 
+        dico_df["sommets_1"] = etats_noeuds_1;
         dico_df["aretes_diff_dc"] = nbre_aretes_diff_dc; 
         dico_df["aretes_diff_dh"] = nbre_aretes_diff_dh;
         dico_df["cliques_couvertures"] = nbre_cliques_couvertures; 
@@ -306,6 +308,7 @@ def sauver_info_execution_dico_df(bool_erreur,
         dico_df["aretes_supprimees"] = aretes_modifiees_alpha["aretes_supprimees"]; 
         dico_df["dc"] = dc; 
         dico_df["dh"] = dh; 
+        dico_df["sommets_1"] = etats_noeuds_1;
         dico_df["aretes_diff_dc"] = nbre_aretes_diff_dc; 
         dico_df["aretes_diff_dh"] = nbre_aretes_diff_dh;
         dico_df["cliques_couvertures"] = nbre_cliques_couvertures; 

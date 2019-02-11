@@ -741,7 +741,7 @@ def simulation_algos_k_erreur(matE_LG,
     path_mat.mkdir(parents=True, exist_ok=True) if not path_mat.is_dir() else None;
 
     rep_base = dico_caracteristiques_graphes["rep_data"] + "/" + \
-                    critere + "/" + \
+                    critere + "_sommets_GR_" + str(len(mat_GR.columns)) + "/" + \
                     mode + "/" + \
                     "data_p_" + str(p_correl);
     chemin_dist = rep_base + "/" + "distribution" + "/"
@@ -760,7 +760,7 @@ def simulation_algos_k_erreur(matE_LG,
     
     
     for alpha_ in range(args["alpha"]) :
-        dico_df = dict();
+        dico_df_tmp = dict();
         try :
             print("G_k = {}, k_erreur = {}, alpha = {}".format(
                   G_k, k_erreur, alpha_))
@@ -788,7 +788,7 @@ def simulation_algos_k_erreur(matE_LG,
             
             cliques_couvertures, aretes_LG_k_alpha_res, etat_noeuds = \
                             algoCouverture.couverture_cliques(
-                                            matE_LG, 
+                                            matE_LG_k_alpha, 
                                             mat_GR, 
                                             dico_arcs_sommets, 
 #                                           caract_correction, 
@@ -802,6 +802,10 @@ def simulation_algos_k_erreur(matE_LG,
             args_res = dict();
             sommets_couverts_cliques = fct_aux.cliques_couvrants_sommets(
                                         cliques_couvertures, etat_noeuds.keys())
+            etats_noeuds_1 = list();
+            etats_noeuds_1 = [k for k,v in etat_noeuds.items() if v == -1]
+            print("5 etats_noeuds_1={}".format(etats_noeuds_1))
+            
             if len(aretes_LG_k_alpha_res) == 0 and \
                 -1 not in etat_noeuds.values() :
                 print("PAS de correction A EFFECTUER : aretes_LG = 0 et not -1")
@@ -863,12 +867,15 @@ def simulation_algos_k_erreur(matE_LG,
                          
             #### enregistrment informations dans dico_df
             bool_error = False
-            dico_df = fct_aux.sauver_info_execution_dico_df(bool_error, 
+            dico_df_tmp = fct_aux.sauver_info_execution_dico_df(bool_error, 
                         G_k, k_erreur, alpha_, len(dico_arcs_sommets.keys()),
                         len(aretes_LG), 
+                        len(aretes_LG_k_alpha),
                         aretes_modifiees_alpha,
                         sommets_couverts_cliques,
                         dc, dh, 
+#                        len(etats_noeuds_1),
+                        etats_noeuds_1,
                         len(aretes_diff_dc), 
                         len(aretes_diff_dh),
                         len(cliques_couvertures), 
@@ -880,18 +887,19 @@ def simulation_algos_k_erreur(matE_LG,
             pass
         except Exception as e:
             bool_error = True
-            dico_df = fct_aux.sauver_info_execution_dico_df(bool_error, 
+            dico_df_tmp = fct_aux.sauver_info_execution_dico_df(bool_error, 
                         G_k, k_erreur, alpha_, len(dico_arcs_sommets.keys()),
-                        len(aretes_LG), 
+                        len(aretes_LG), len(aretes_LG_k_alpha),
                         aretes_modifiees_alpha
                         )
             pass
         
         # convertir df_dico en dataframe
         print("6 ")
-        df = pd.DataFrame.from_dict(dico_df, orient="index");
+        print("6 dico_df = {}".format(dico_df_tmp))
+        dico_df = {G_k: dico_df_tmp}
         print("61")
-        df.columns = [G_k];
+        df = pd.DataFrame.from_dict(dico_df);
         df["index"] = df.index;
         
         # save dataframe
@@ -914,11 +922,11 @@ def simulation_algos_k_erreur(matE_LG,
                         max(moy_dist_hamming, moy_dist_correction)
     
     # ecrire dans un fichier pouvant etre lu pendant qu'il continue d'etre ecrit
-    f = open(path_dist + 
-             "distribution_moyDistLine_moyHamming_k_" +
-             str(k_erreur) + 
+    f = open(chemin_dist + \
+             "distribution_moyDistLine_moyHamming_k_" + \
+             str(k_erreur) + \
              ".txt","a")
-    f.write(G_k + ";" +\
+    f.write(str(G_k) + ";" +\
             str(k_erreur) + ";" + \
             str(moy_dist_correction) + ";" + \
             str(moy_dist_hamming) + ";" + \
@@ -950,7 +958,7 @@ if __name__ == '__main__':
     grandeurs = ["P"]; #["I","U","P"];
     
     # nombres et types de corrections
-    k_erreur = 5 # 1
+    k_erreur = 1 #5 # 1
     k_erreurs_min = 0;
     k_erreurs_max = 2;
     step_range_k_erreur = 1;
@@ -960,7 +968,7 @@ if __name__ == '__main__':
     p_correl_max = 1; 
     p_correl_min = 0;
     step_range_p = 0.1;
-    alpha = 1;
+    alpha = 3;
     ajout_del = 1                                                               #{0='ajout arete',1='suppression arete',2='ajout et supp'}
     modes_correction = ["aleatoire_sans_remise", 
                          "degre_min_sans_remise", 
@@ -1016,8 +1024,10 @@ if __name__ == '__main__':
     
     if bool_test_functions :
         df_test_supp_aretes = test_suppression_ajout_aretes(graphes_GR_LG);
-        nbre_alea = 0 #random.choice(range(0, len(graphes_GR_LG))) # pour des tests aleatoires.
-#        simulation_algos_k_erreur(graphes_GR_LG[nbre_alea])
+        #nbre_alea = 0 #random.choice(range(0, len(graphes_GR_LG))) # pour des tests aleatoires.
+        #simulation_algos_k_erreur(*graphes_GR_LG[nbre_alea])
+        for graphe_GR_LG in graphes_GR_LG :
+            simulation_algos_k_erreur(*graphe_GR_LG)
         
         
     # partitionnement en cliques de LG
