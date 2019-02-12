@@ -9,6 +9,7 @@ Created on Fri Jan 11 12:56:11 2019
 import time;
 import itertools as it;
 import pandas as pd;
+import numpy as np;
 from pathlib import Path 
 
 def voisins(liste_arcs, noeud):
@@ -17,6 +18,7 @@ def voisins(liste_arcs, noeud):
     """        
     liste_voisins = list()
     for arc in liste_arcs:
+        arc = list(arc)
         if noeud == arc[0]:
             liste_voisins.append( arc[1] )
         if noeud == arc[1]:
@@ -159,6 +161,31 @@ def comparer_cliques(C, C_old):
     cliques_differentes = C.union(C_old)- C.intersection(C_old);
     
     return cliques_identiques, cliques_differentes;
+
+def mise_a_jour_distance_moyenne(dc, dh, 
+                                 sum_dist_correction,
+                                 sum_dist_hamming) :
+
+    if dc != np.inf and sum_dist_correction != np.inf :
+        sum_dist_correction += dc;
+    elif dc != np.inf and sum_dist_correction == np.inf :
+        sum_dist_correction = dc;
+    elif dc == np.inf and sum_dist_correction != np.inf :
+        sum_dist_correction += 0;
+    elif dc == np.inf and sum_dist_correction == np.inf :
+        sum_dist_correction = np.inf;
+        
+    if dh != np.inf and sum_dist_hamming != np.inf :
+        sum_dist_correction += dh;
+    elif dh != np.inf and sum_dist_hamming == np.inf :
+        sum_dist_hamming = dh;
+    elif dh == np.inf and sum_dist_hamming != np.inf :
+        sum_dist_hamming += 0;
+    elif dh == np.inf and sum_dist_hamming == np.inf :
+        sum_dist_hamming = np.inf;
+                
+    return sum_dist_correction,  sum_dist_hamming
+
         
 def is_locked(filepath, df, G_k):
     """
