@@ -187,7 +187,7 @@ def mise_a_jour_distance_moyenne(dc, dh,
     return sum_dist_correction,  sum_dist_hamming
 
         
-def is_locked(filepath, df, G_k):
+def is_locked_old(filepath, df, G_k):
     """
     Checks if a file is locked by opening it in append mode.
     If no exception thrown, then the file is not locked.
@@ -221,7 +221,43 @@ def is_locked(filepath, df, G_k):
     print("locked={}".format(locked))
     return locked;
     
-def sauver_df_resume(df, name_save_df, G_k):
+def is_locked(filepath, dico_df, G_k):
+    """
+    Checks if a file is locked by opening it in append mode.
+    If no exception thrown, then the file is not locked.
+    
+    """
+    locked = None
+    file_object = None
+    
+    try:
+        print("Trying to open {} resumeExecution.".format(G_k))
+        buffer_size = 8
+        # Opening file in append mode and read the first 8 characters.
+        file_object = open(filepath, 'a', buffer_size)
+        if file_object:
+            df_resExec = pd.read_csv(filepath, sep = ",", index_col = "index");
+            print("open ")
+            # conversion a dataframe to dictionary, add a graph and save to dataframe
+            dico_resExec = df_resExec.to_dict()
+            dico_resExec[G_k] = dico_df;
+            df_resExec = pd.DataFrame.from_dict(dico_resExec);
+            df_resExec.to_csv(filepath, index_label = "index")
+            print("sauve {}".format(G_k))
+            locked = False;
+    except IOError as message:
+        print("resumeExecution_{}.csv is not locked ({}).".format( \
+                  G_k.split("_")[2], message ))
+        locked = True;
+    finally:
+        if file_object:
+            file_object.close();
+            print("resumeExecution_{}.csv  closed.".format( \
+                  G_k.split("_")[2]))
+    print("locked={}".format(locked))
+    return locked;
+    
+def sauver_df_resume(dico_df, name_save_df, G_k):
     """ 
     sauvegarder le dataframe contenant la colonne G_numeroGraphe_k 
     dans le dataframe generale 
@@ -238,16 +274,15 @@ def sauver_df_resume(df, name_save_df, G_k):
     print("sauver ")
     temps_attente = 0.010;                                                      # attente de 10 ms
     if my_file.is_file():
-        while is_locked(name_save_df, df, G_k):
+        while is_locked(name_save_df, dico_df, G_k):
             print("reseumeExecution_{} is currently in use. Waiting {} milliseconds.".\
                   format((G_k.split("_")[2], temps_attente)))
             time.sleep(temps_attente);
     else:
         print("sauve :)")
-        df.to_csv(name_save_df, sep=',', index=False);
+        df = pd.DataFrame.from_dict({G_k:dico_df})
+        df.to_csv(name_save_df, sep=',', index_label="index");
     print("sauver fin")
-    
-    
     
 def sauver_info_execution_dico_df(bool_erreur, 
                         G_k, k_erreur, alpha_, nbre_sommets_matE_LG, 
