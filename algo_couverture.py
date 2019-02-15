@@ -599,7 +599,7 @@ def couverture_cliques(matE_LG,
                     print("ARETES_RESTANTES = {}".format(aretes));
             for C in [C1,C2]:
                 if C :
-                    cliques_couvertures.append(C)
+                    cliques_couvertures.append(frozenset(C))
             pass # else
         pass
     
