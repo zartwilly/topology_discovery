@@ -767,7 +767,9 @@ def simulation_algos_k_erreur(matE_LG,
     sommets_1_moyens = list();    
     
     for alpha_ in range(args["alpha"]) :
-        dico_df_tmp = dict();
+        dico_df = dict();
+        dc = np.inf; aretes_diff_dc = set();
+        dh = np.inf; aretes_diff_dh = set();
         try :
             print("G_k = {}, k_erreur = {}, alpha = {}".format(
                   G_k, k_erreur, alpha_))
@@ -829,7 +831,7 @@ def simulation_algos_k_erreur(matE_LG,
             
             if len(aretes_LG_k_alpha_res) == 0 and \
                 -1 not in etat_noeuds.values() :
-                dc = 0; dh = 0;
+                dc = 0; dh = k_erreur;
                 sum_dist_correction, sum_dist_hamming = \
                     fct_aux.mise_a_jour_distance_moyenne(dc, dh, 
                                              sum_dist_correction,
@@ -838,7 +840,7 @@ def simulation_algos_k_erreur(matE_LG,
                 pass
             elif len(aretes_LG_k_alpha_res) != 0 and \
                 -1 not in etat_noeuds.values() :
-                dc = 0; 
+                dc = len(aretes_LG_k_alpha_res)#0; 
                 aretes_diff_dc = set();
                 aretes_diff_dh = aretes_LG_k_alpha_res + \
                                 aretes_modifiees_alpha["aretes_supprimees"] + \
@@ -876,8 +878,6 @@ def simulation_algos_k_erreur(matE_LG,
             cliques_couvertures_apres_correct = list();
             cliques_idents_avant_apres_correct = list();   
             cliques_diffs_avant_apres_correct = list();
-            dc = np.inf; aretes_diff_dc = list();
-            dh = np.inf; aretes_diff_dh = list();
             
             if args_res and ("0_0", "0_0") not in dico_solution.keys() :
                 cliques_couvertures_apres_correct = args_res["C"]; 
@@ -916,7 +916,7 @@ def simulation_algos_k_erreur(matE_LG,
                                              sum_dist_hamming)
             #### enregistrment informations dans dico_df
             bool_error = False
-            dico_df_tmp = fct_aux.sauver_info_execution_dico_df(bool_error, 
+            dico_df = fct_aux.sauver_info_execution_dico_df(bool_error, 
                         G_k, k_erreur, alpha_, len(dico_arcs_sommets.keys()),
                         len(aretes_LG), 
                         len(aretes_LG_k_alpha),
@@ -940,33 +940,29 @@ def simulation_algos_k_erreur(matE_LG,
                       num_graphe, e
                       )
                     );
-            dico_df_tmp = fct_aux.sauver_info_execution_dico_df(bool_error, 
+            dico_df = fct_aux.sauver_info_execution_dico_df(bool_error, 
                         G_k, k_erreur, alpha_, len(dico_arcs_sommets.keys()),
                         len(aretes_LG), len(aretes_LG_k_alpha),
                         aretes_modifiees_alpha
                         )
             pass
         
-        # convertir df_dico en dataframe
         print("6 ")
-        print("6 dico_df = {}".format(dico_df_tmp))
-        dico_df = {G_k: dico_df_tmp}
-        print("61")
-        df = pd.DataFrame.from_dict(dico_df);
-        df["index"] = df.index;
         
         # save dataframe
-        print("7")
+        G_k_alpha = G_k + "_" + str(alpha_);
         name_save_df = rep_base + "/" + "distribution" + "/" + \
                        "resumeExecution_"+ str(k_erreur) + ".csv"; 
-        fct_aux.sauver_df_resume(df, name_save_df, G_k); 
-        print("8")
+        fct_aux.sauver_df_resume(dico_df, name_save_df, G_k_alpha); 
+        print("7")
+         
+
     # EndFor alpha range(alpha)
     
     # moyenner dist_line et hamming pour k aretes supprimes
     moy_dist_correction = sum_dist_correction / args["alpha"];
     moy_dist_hamming = sum_dist_hamming / args["alpha"];
-    print("9 moy_dist_correction={},moy_dist_hamming={}".format(
+    print("8 moy_dist_correction={},moy_dist_hamming={}".format(
           moy_dist_correction,moy_dist_hamming))
     if moy_dist_hamming == 0 and moy_dist_correction == 0:
         correl_dc_dh = 1;
@@ -1015,7 +1011,7 @@ def simulation_algos_k_erreur(matE_LG,
 if __name__ == '__main__':
     ti = time.time();
     
-    NBRE_GRAPHES = 10;
+    NBRE_GRAPHES = 10; #1
     rep_data = "data_test"
     bool_test = True;
     bool_test_k_1_2 = True;
@@ -1042,7 +1038,7 @@ if __name__ == '__main__':
     p_correl_max = 1; 
     p_correl_min = 0;
     step_range_p = 0.1;
-    alpha = 3;
+    alpha = 3 #1;
     ajout_del = 1                                                               #{0='ajout arete',1='suppression arete',2='ajout et supp'}
     modes_correction = ["aleatoire_sans_remise", 
                          "degre_min_sans_remise", 
