@@ -126,6 +126,7 @@ def cliques_couvrants_sommets(cliques_couvertures, sommets_matE_LG):
                                     set(sommets_couverts_cliques.keys())
     for sommet in sommets_not_couverts_cliques:
         sommets_couverts_cliques[sommet] = [];
+        
     return sommets_couverts_cliques;
     
 def aretes_dans_cliques(cliques_couvertures):
