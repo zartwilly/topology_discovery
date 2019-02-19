@@ -726,6 +726,20 @@ def simulation_algos_k_erreur(matE_LG,
             "ajout_del":{0='ajout arete',1='suppression arete',2='ajout et supp'}}
     """
 
+    logging.basicConfig(format='%(asctime)s - %(message)s', 
+                        level=logging.DEBUG,
+                        datefmt='%d-%b-%y %H:%M:%S',
+                        filename=args["log_file"],
+#                        filemode="w")
+                        filemode="w")
+    
+    logger = logging.getLogger('simulation_algos_k_erreur')
+    logger.debug("\n\n\n\n\n\n\n\n\n")
+    logger.debug("############################################################")
+    logger.debug("##      nouvelle execution k = {}  ##".format(caract_tuple[4]))
+    logger.debug("############################################################")
+    
+    
     # initialisation des variables sur les criteres de correction et info sur graphe 
     critere = caract_tuple[0];
     mode = caract_tuple[1];
@@ -740,7 +754,7 @@ def simulation_algos_k_erreur(matE_LG,
     path_mat = Path(chemin_matrice);
     path_mat.mkdir(parents=True, exist_ok=True) if not path_mat.is_dir() else None;
 
-    rep_base = dico_caracteristiques_graphes["rep_data"] + "/" + \
+    rep_base = args["rep_data"] + "/" + \
                     critere + "_sommets_GR_" + str(len(mat_GR.columns)) + "/" + \
                     mode + "/" + \
                     "data_p_" + str(p_correl);
@@ -762,7 +776,7 @@ def simulation_algos_k_erreur(matE_LG,
     moy_dist_hamming = 0; sum_dist_hamming = np.inf; #0;
     moy_dist_correction = 0; sum_dist_correction = np.inf; #0
     correl_dc_dh = 0;
-    G_k = "G_"+str(num_graphe)+"_"+str(k_erreur)
+    G_k = "G_"+str(num_graphe)+"_"+str(k_erreur);
     
     sommets_1_moyens = list();    
     
@@ -770,8 +784,10 @@ def simulation_algos_k_erreur(matE_LG,
         dico_df = dict();
         dc = np.inf; aretes_diff_dc = set();
         dh = np.inf; aretes_diff_dh = set();
+        aretes_diff_dc_avant_corr = set();
+        aretes_diff_dh_avant_corr = set();
         try :
-            print("G_k = {}, k_erreur = {}, alpha = {}".format(
+            print("\n \n G_k = {}, k_erreur = {}, alpha = {}".format(
                   G_k, k_erreur, alpha_))
             
             # modification de k_erreur aretes
@@ -787,6 +803,11 @@ def simulation_algos_k_erreur(matE_LG,
                                 str(k_erreur) + "_" +
                                 str(alpha_) +
                                 ".csv", index_label = INDEX_COL_MATE_LG);
+            
+            aretes_diff_dc_avant_corr = distance_hamming(aretes_LG_k_alpha, 
+                                                         aretes_LG_k_alpha)
+            aretes_diff_dh_avant_corr = distance_hamming(aretes_LG, 
+                                                         aretes_LG_k_alpha)
             
             # algorithme de couverture
             cliques_couvertures = list(); 
@@ -829,6 +850,7 @@ def simulation_algos_k_erreur(matE_LG,
                             )
                         )
             
+            cas_traite = "";
             if len(aretes_LG_k_alpha_res) == 0 and \
                 -1 not in etat_noeuds.values() :
                 dc = 0; dh = k_erreur;
@@ -836,6 +858,7 @@ def simulation_algos_k_erreur(matE_LG,
                     fct_aux.mise_a_jour_distance_moyenne(dc, dh, 
                                              sum_dist_correction,
                                              sum_dist_hamming)
+                cas_traite = "aretes=0,not-1"
                 print("PAS de correction A EFFECTUER : aretes_LG = 0 et not -1")
                 pass
             elif len(aretes_LG_k_alpha_res) != 0 and \
@@ -849,12 +872,30 @@ def simulation_algos_k_erreur(matE_LG,
                 sum_dist_correction, sum_dist_hamming = \
                     fct_aux.mise_a_jour_distance_moyenne(dc, dh, 
                                              sum_dist_correction,
-                                             sum_dist_hamming)            
+                                             sum_dist_hamming)
+                cas_traite = "aretes!=0,not-1"
                 print("PAS de correction A EFFECTUER : aretes_LG != 0 et not -1")
                 pass
             elif len(aretes_LG_k_alpha_res) == 0 and \
                 -1 in etat_noeuds.values() :
                 print("PROBLEME : aretes_LG == 0 et -1")
+#                print("PROBLEME : cliques : {}".format(cliques_couvertures))
+#                print("PROBLEME : sommets_couverts_cliques : {}".format(sommets_couverts_cliques))
+                args["C"] = cliques_couvertures.copy();
+                args["sommets_couverts_cliques"] = sommets_couverts_cliques;
+                args["etat_noeuds"] = etat_noeuds;
+                args["aretes_LG_k_alpha"] = aretes_LG_k_alpha;
+                args["gamma_sommets"] = fct_aux.gamma(matE_LG_k_alpha);
+                args["aretes_cliques"] = fct_aux.aretes_dans_cliques(
+                                            cliques_couvertures);
+                args["critere_selection_compression"] = critere;
+                args["mode_correction"] = mode;
+                args["dbg"] = dbg;
+                args["numero_graphe"] = G_k;
+
+                args_res, dico_solution = \
+                        algoCorrection.correction_graphe_correlation(args);
+                cas_traite = "aretes=0,-1"
                 pass
             elif len(aretes_LG_k_alpha_res) != 0 and \
                 -1 in etat_noeuds.values() :
@@ -868,9 +909,12 @@ def simulation_algos_k_erreur(matE_LG,
                                             cliques_couvertures);
                 args["critere_selection_compression"] = critere;
                 args["mode_correction"] = mode;
+                args["dbg"] = dbg;
+                args["numero_graphe"] = G_k;
 
                 args_res, dico_solution = \
                         algoCorrection.correction_graphe_correlation(args);
+                cas_traite = "aretes!=0,-1"
 #                logger.debug("***** Fin Algorithme de correction ")
                 pass
             
@@ -883,11 +927,13 @@ def simulation_algos_k_erreur(matE_LG,
                 cliques_couvertures_apres_correct = args_res["C"]; 
                 aretes_diff_dc = distance_hamming(
                                         aretes_LG_k_alpha,
-                                        args["aretes_LG_k_alpha"]
+#                                        args_res["aretes_LG_k_alpha"]
+                                        fct_aux.aretes_dans_cliques(args_res["C"])
                                         )
                 aretes_diff_dh = distance_hamming(
                                         aretes_LG,
-                                        args["aretes_LG_k_alpha"]
+#                                        args_res["aretes_LG_k_alpha"]
+                                        fct_aux.aretes_dans_cliques(args_res["C"])
                                         )
                 dc = len(aretes_diff_dc);
                 sum_dist_correction += dc ;
@@ -915,12 +961,15 @@ def simulation_algos_k_erreur(matE_LG,
                                              sum_dist_correction,
                                              sum_dist_hamming)
             #### enregistrment informations dans dico_df
-            bool_error = False
+            bool_error = False # True
             dico_df = fct_aux.sauver_info_execution_dico_df(bool_error, 
                         G_k, k_erreur, alpha_, len(dico_arcs_sommets.keys()),
                         len(aretes_LG), 
                         len(aretes_LG_k_alpha),
+                        cas_traite,
                         aretes_modifiees_alpha,
+                        len(aretes_diff_dc_avant_corr),
+                        len(aretes_diff_dh_avant_corr),
                         sommets_couverts_cliques,
                         dc, dh, 
 #                        len(etats_noeuds_1),
@@ -942,8 +991,10 @@ def simulation_algos_k_erreur(matE_LG,
                     );
             dico_df = fct_aux.sauver_info_execution_dico_df(bool_error, 
                         G_k, k_erreur, alpha_, len(dico_arcs_sommets.keys()),
-                        len(aretes_LG), len(aretes_LG_k_alpha),
-                        aretes_modifiees_alpha
+                        len(aretes_LG), len(aretes_LG_k_alpha), cas_traite,
+                        aretes_modifiees_alpha,
+                        len(aretes_diff_dc_avant_corr),
+                        len(aretes_diff_dh_avant_corr)
                         )
             pass
         
@@ -993,6 +1044,7 @@ def simulation_algos_k_erreur(matE_LG,
             str(k_erreur) + ";" + \
             str( round(moy_dist_correction,2) ) + ";" + \
             str( round(moy_dist_hamming,2) ) + ";" + \
+#            str( len() ) + ";" + \
             str(nbre_sommets_LG) + ";" + \
             str(len(aretes_LG)) + ";" + \
             str(correl_dc_dh) + ";" + \
@@ -1011,7 +1063,9 @@ def simulation_algos_k_erreur(matE_LG,
 if __name__ == '__main__':
     ti = time.time();
     
-    NBRE_GRAPHES = 10; #1
+    log_file = "DEBUG_CRITERE_C2C1.log";
+    
+    NBRE_GRAPHES = 10#300; #1
     rep_data = "data_test"
     bool_test = True;
     bool_test_k_1_2 = True;
@@ -1020,7 +1074,7 @@ if __name__ == '__main__':
     
     
     # caracteristiques graphes racines
-    nbre_sommets_GR = 5;
+    nbre_sommets_GR = 8#5;
     nbre_moyen_liens = (2,5);
     epsilon = 0.75; effet_joule = 0;
     nbre_ts = 10;
@@ -1028,7 +1082,7 @@ if __name__ == '__main__':
     number_items_pi1_pi2 = 0.5;
     
     # nombres et types de corrections
-    k_erreur = 1 #5 # 1
+    k_erreur = 0#1 #5 # 1
     k_erreurs_min = 0;
     k_erreurs_max = 2;
     step_range_k_erreur = 1;
@@ -1038,7 +1092,7 @@ if __name__ == '__main__':
     p_correl_max = 1; 
     p_correl_min = 0;
     step_range_p = 0.1;
-    alpha = 3 #1;
+    alpha = 1#3 #1;
     ajout_del = 1                                                               #{0='ajout arete',1='suppression arete',2='ajout et supp'}
     modes_correction = ["aleatoire_sans_remise", 
                          "degre_min_sans_remise", 
@@ -1072,7 +1126,8 @@ if __name__ == '__main__':
                                "criteres_selection_compression" : criteres_selection_compression,
                                }
     args = {"rep_data": rep_data, "alpha": alpha, "ajout_del":ajout_del,
-            "number_items_pi1_pi2": number_items_pi1_pi2}
+            "number_items_pi1_pi2": number_items_pi1_pi2, 
+            "log_file":log_file}
 #    k_erreur = 1;
     
     # creation de graphes racines GR et de line-graphes LG
@@ -1094,7 +1149,7 @@ if __name__ == '__main__':
                             dbg);
     
     if bool_test_functions :
-        df_test_supp_aretes = test_suppression_ajout_aretes(graphes_GR_LG);
+#        df_test_supp_aretes = test_suppression_ajout_aretes(graphes_GR_LG);
         #nbre_alea = 0 #random.choice(range(0, len(graphes_GR_LG))) # pour des tests aleatoires.
         #simulation_algos_k_erreur(*graphes_GR_LG[nbre_alea])
         for graphe_GR_LG in graphes_GR_LG :
