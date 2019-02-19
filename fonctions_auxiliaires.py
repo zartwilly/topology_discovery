@@ -289,7 +289,10 @@ def sauver_info_execution_dico_df(bool_erreur,
                         G_k, k_erreur, alpha_, nbre_sommets_matE_LG, 
                         nbre_aretes_LG, 
                         nbre_aretes_LG_k_alpha,
+                        cas_traite,
                         aretes_modifiees_alpha,
+                        nbre_aretes_diff_dc_avant_corr,
+                        nbre_aretes_diff_dh_avant_corr,
                         sommets_couverts_cliques = {},
                         dc = "error", dh = "error", 
                         etats_noeuds_1 = "error",
@@ -316,8 +319,11 @@ def sauver_info_execution_dico_df(bool_erreur,
         dico_df["nbre_sommets_matE_LG"] = nbre_sommets_matE_LG,
         dico_df["aretes_LG"] = nbre_aretes_LG; 
         dico_df["aretes_LG_k_alpha"] = nbre_aretes_LG_k_alpha; 
+        dico_df["cas_traite"] = cas_traite,
         dico_df["aretes_ajoutees"] = aretes_modifiees_alpha["aretes_ajoutees"]; 
         dico_df["aretes_supprimees"] = aretes_modifiees_alpha["aretes_supprimees"];
+        dico_df["nbre_aretes_diff_dc_avant_corr"] = nbre_aretes_diff_dc_avant_corr;
+        dico_df["nbre_aretes_diff_dh_avant_corr"] = nbre_aretes_diff_dh_avant_corr;
         dico_df["dc"] = dc; 
         dico_df["dh"] = dh; 
         dico_df["sommets_1"] = etats_noeuds_1;
@@ -365,10 +371,13 @@ def sauver_info_execution_dico_df(bool_erreur,
         dico_df["k_erreur"] = k_erreur; 
         dico_df["alpha"] = alpha_;
         dico_df["nbre_sommets_matE_LG"] = nbre_sommets_matE_LG,
+        dico_df["cas_traite"] = cas_traite,
         dico_df["aretes_LG"] = nbre_aretes_LG; 
         dico_df["aretes_LG_k_alpha"] = nbre_aretes_LG_k_alpha; 
         dico_df["aretes_ajoutees"] = aretes_modifiees_alpha["aretes_ajoutees"]; 
         dico_df["aretes_supprimees"] = aretes_modifiees_alpha["aretes_supprimees"]; 
+        dico_df["nbre_aretes_diff_dc_avant_corr"] = nbre_aretes_diff_dc_avant_corr;
+        dico_df["nbre_aretes_diff_dh_avant_corr"] = nbre_aretes_diff_dh_avant_corr;
         dico_df["dc"] = dc; 
         dico_df["dh"] = dh; 
         dico_df["sommets_1"] = etats_noeuds_1;
