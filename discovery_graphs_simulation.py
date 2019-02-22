@@ -778,7 +778,7 @@ def simulation_algos_k_erreur(matE_LG,
     correl_dc_dh = 0;
     G_k = "G_"+str(num_graphe)+"_"+str(k_erreur);
     
-    sommets_1_moyens = list();    
+    sommets_1_moyens = list();
     
     for alpha_ in range(args["alpha"]) :
         dico_df = dict();
@@ -944,6 +944,15 @@ def simulation_algos_k_erreur(matE_LG,
                     fct_aux.mise_a_jour_distance_moyenne(dc, dh, 
                                              sum_dist_correction,
                                              sum_dist_hamming)
+                    
+                if len(aretes_diff_dh) == 0 :
+                    moyen_aretes_modifiees_par_corr_diff_k_aretes_modifs = list()
+                else :
+                    for arete in aretes_modifiees_alpha : 
+                        if arete in aretes_diff_dh :
+                            moyen_aretes_modifiees_par_corr_diff_k_aretes_modifs.append(
+                                arete
+                            )
                 
                 cliques_idents_avant_apres_correct, \
                 cliques_diffs_avant_apres_correct = \
@@ -977,6 +986,7 @@ def simulation_algos_k_erreur(matE_LG,
                         len(aretes_diff_dc), 
                         len(aretes_diff_dh),
                         len(cliques_couvertures), 
+                        cliques_couvertures,
                         len(cliques_couvertures_apres_correct),
                         len(cliques_idents_avant_apres_correct),
                         len(cliques_diffs_avant_apres_correct),
@@ -1027,8 +1037,10 @@ def simulation_algos_k_erreur(matE_LG,
     for tuple_sommets_1_moyen in sommets_1_moyens :
         set_moyen_sommets_1.add( tuple_sommets_1_moyen[0] )
         list_moyen_sommets_1_in_aretes_modifs.append( tuple_sommets_1_moyen[3] )
+    
     nbre_moyen_sommets_1 = np.inf;
     nbre_moyen_sommets_1_in_aretes_modifs = np.inf;
+    
     nbre_alpha_reussi = len(sommets_1_moyens);
     nbre_moyen_sommets_1 = sum(set_moyen_sommets_1)/len(set_moyen_sommets_1);
     nbre_moyen_sommets_1_in_aretes_modifs = \
