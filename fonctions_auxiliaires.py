@@ -299,6 +299,7 @@ def sauver_info_execution_dico_df(bool_erreur,
                         nbre_aretes_diff_dc = "error", 
                         nbre_aretes_diff_dh = "error",
                         nbre_cliques_couvertures = "error", 
+                        cliques_couvertures = "error",
                         nbre_cliques_couvertures_apres_correct = "error",
                         nbre_cliques_idents_avant_apres_correct = "error",
                         nbre_cliques_diffs_avant_apres_correct = "error",
@@ -329,7 +330,8 @@ def sauver_info_execution_dico_df(bool_erreur,
         dico_df["sommets_1"] = etats_noeuds_1;
         dico_df["aretes_diff_dc"] = nbre_aretes_diff_dc; 
         dico_df["aretes_diff_dh"] = nbre_aretes_diff_dh;
-        dico_df["cliques_couvertures"] = nbre_cliques_couvertures; 
+        dico_df["nbre_cliques_couvertures"] = nbre_cliques_couvertures; 
+        dico_df["cliques_couvertures"] = cliques_couvertures; 
         dico_df["cliques_couvertures_apres_correct"] = \
                                     nbre_cliques_couvertures_apres_correct;
         dico_df["cliques_idents_avant_apres_correct"] = \
@@ -383,7 +385,8 @@ def sauver_info_execution_dico_df(bool_erreur,
         dico_df["sommets_1"] = etats_noeuds_1;
         dico_df["aretes_diff_dc"] = nbre_aretes_diff_dc; 
         dico_df["aretes_diff_dh"] = nbre_aretes_diff_dh;
-        dico_df["cliques_couvertures"] = nbre_cliques_couvertures; 
+        dico_df["nbre_cliques_couvertures"] = nbre_cliques_couvertures; 
+        dico_df["cliques_couvertures"] = cliques_couvertures; 
         dico_df["cliques_couvertures_apres_correct"] = \
                                     nbre_cliques_couvertures_apres_correct;
         dico_df["cliques_idents_avant_apres_correct"] = \
