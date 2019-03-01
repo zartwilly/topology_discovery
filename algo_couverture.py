@@ -557,7 +557,8 @@ def couverture_cliques(matE_LG,
                 etat_noeuds[noeud] = -1;
             
             # verification des noeuds voisins de "noeud" dans C1 et C2
-            for voisin_w in gamma_noeud :
+            # for voisin_w in gamma_noeud :
+            for voisin_w in C1.union(C2) - {noeud}:
                 gamma_voisin_w = gamma_noeuds[voisin_w];
                 if len( C1.union(C2).union(gamma_noeuds[voisin_w]) - \
                        C1.union(C2) ) != 0:                                     #je considere len(C1.union(C2)) < gamma_noeuds[voisin_w]
