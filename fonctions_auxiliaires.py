@@ -395,3 +395,28 @@ def sauver_info_execution_dico_df(bool_erreur,
                                     nbre_cliques_diffs_avant_apres_correct;
                                     
     return dico_df;
+    
+    
+def rechercher_position_sommets_a_corriger(etat_noeuds, 
+                                           gamma, 
+                                           aretes_modifiees_alpha ) :
+    """
+    trouver le nombre de sommets a -1 voisins de sommets des aretes modifiees.
+    
+    """
+    etats_noeuds_1 = [k for k,v in etat_noeuds.items() if v == -1]
+    
+    sommets = set();
+    aretes_modifs = aretes_modifiees_alpha["aretes_ajoutees"] + \
+                    aretes_modifiees_alpha["aretes_supprimees"]
+    print("---> aretes_modifs = {}".format(aretes_modifs))
+    for arete in aretes_modifs :
+        u = tuple(arete)[0]; v = tuple(arete)[1];
+        gamma_u = gamma[u];
+        gamma_v = gamma[v];
+        
+        inter_u = set(gamma_u).intersection( set(etats_noeuds_1) )
+        inter_v = set(gamma_v).intersection( set(etats_noeuds_1) )
+        
+        sommets = sommets.union(inter_u.union(inter_v))
+    return sommets;
