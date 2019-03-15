@@ -779,6 +779,7 @@ def simulation_algos_k_erreur(matE_LG,
     G_k = "G_"+str(num_graphe)+"_"+str(k_erreur);
     
     sommets_1_moyens = list();
+    sommets_1_voisins_moyens  = list()
     
     for alpha_ in range(args["alpha"]) :
         dico_df = dict();
@@ -830,8 +831,13 @@ def simulation_algos_k_erreur(matE_LG,
             args_res = dict();
             sommets_couverts_cliques = fct_aux.cliques_couvrants_sommets(
                                         cliques_couvertures, etat_noeuds.keys())
-            etats_noeuds_1 = list();
-            etats_noeuds_1 = [k for k,v in etat_noeuds.items() if v == -1]
+#            etats_noeuds_1 = list();
+#            etats_noeuds_1 = [k for k,v in etat_noeuds.items() if v == -1]
+            gamma = fct_aux.gamma(matE_LG_k_alpha)
+            print("----> ")
+            etats_noeuds_1 = fct_aux.rechercher_position_sommets_a_corriger(
+                                etat_noeuds, gamma, aretes_modifiees_alpha
+                                )
             print("5 etats_noeuds_1={}".format(etats_noeuds_1))
             
             #### compter le nombre de sommets -1 appartenant aux extremites des aretes modifiees
