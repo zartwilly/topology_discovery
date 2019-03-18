@@ -51,32 +51,93 @@ def liste_arcs(mat):
             res.append(tuple(sorted([row, col])))
     return res;
     
-def liste_aretes(mat):#, dico_arcs_sommets):
-    """ retourne la liste des aretes d'un graphe. """
-    res = list();
-    if type(mat) not in [set, list, dict]:
-        for row, col in range_2d(mat.columns.tolist()):
-            if mat.loc[row][col] == 1 or mat.loc[col][row] == 1:
-                res.append( frozenset((row, col)) );
-    else:
-        for arete in it.combinations(mat,2):
-#            res.append( set(arete));           # commenter a cause de ligne 217 algo_couverture (aretes = fct_aux.liste_aretes(matE_LG);)
-            res.append( frozenset(arete));
-    return res;
-    
-def liste_not_aretes(mat):#, dico_arcs_sommets):
-    """ retourne la liste des aretes d'un graphe. """
-    res = list();
-    if type(mat) not in [set, list, dict]:
-        for row, col in range_2d(mat.columns.tolist()):
-            if mat.loc[row,col] == 0 or mat.loc[col,row] == 0:
-                res.append( frozenset((row, col)) );
-    else:
-#        FAUX
+#def liste_aretes(mat):#, dico_arcs_sommets):
+#    """ retourne la liste des aretes d'un graphe. """
+#    res = list();
+#    if type(mat) not in [set, list, dict]:
+#        for row, col in range_2d(mat.columns.tolist()):
+#            if mat.loc[row][col] == 1 or mat.loc[col][row] == 1:
+#                res.append( frozenset((row, col)) );
+#    else:
 #        for arete in it.combinations(mat,2):
 ##            res.append( set(arete));           # commenter a cause de ligne 217 algo_couverture (aretes = fct_aux.liste_aretes(matE_LG);)
 #            res.append( frozenset(arete));
+#    return res;
+def liste_aretes(mat, type_arete=frozenset) :
+    """ retourne la liste des aretes d'un graphe. """
+    res = list();
+    if isinstance(mat, pd.DataFrame) : 
+        for row, col in range_2d(mat.columns.tolist()):
+            if mat.loc[row,col] == 1 or mat.loc[col,row] == 1:
+                res.append( (row, col) );
+        res = list(map(type_arete, res));
+                    
+    elif isinstance(mat, set) or isinstance(mat, list) :
+        for arete in it.combinations(mat,2):
+            res.append(arete);
+        res = list(map(type_arete, res));
+                
+    elif isinstance(mat, dict) :
+        aretes = list()
+        for sommet, voisins in mat.items() :
+            aretes.extend( it.product(sommet, voisins) );
+        res = list(map(type_arete, aretes))
+        
+    return res;
+
+    
+#def liste_not_aretes(mat):#, dico_arcs_sommets):
+#    """ retourne la liste des couples n'etant pas des aretes d'un graphe. """
+#    res = list();
+#    if type(mat) not in [set, list, dict]:
+#        for row, col in range_2d(mat.columns.tolist()):
+#            if mat.loc[row,col] == 0 or mat.loc[col,row] == 0:
+#                res.append( frozenset((row, col)) );
+#    else:
+##        FAUX
+##        for arete in it.combinations(mat,2):
+###            res.append( set(arete));           # commenter a cause de ligne 217 algo_couverture (aretes = fct_aux.liste_aretes(matE_LG);)
+##            res.append( frozenset(arete));
+#        pass
+#    return res;
+
+def transform_dico_to_matrix(dico) :
+    sommets = list(dico.keys())
+    df = pd.DataFrame(columns = sommets, index = sommets)
+    aretes = list();
+    for sommet, voisins in dico.items() :
+        aretes.extend( it.product(sommet, voisins) )
+    for arete in aretes :
+        df.loc[arete[0], arete[1]] = 1;
+        df.loc[arete[1], arete[0]] = 1;
+    df.fillna(0, inplace = True);
+    
+    return df.astype(int);
+
+def liste_not_aretes(mat, type_arete=frozenset):
+    """ retourne la liste des couples n'etant pas des aretes d'un graphe. """
+    res = list();
+    if isinstance(mat, pd.DataFrame) :
+        for row, col in range_2d(mat.columns.tolist()):
+            if mat.loc[row,col] == 0 or mat.loc[col,row] == 0:
+                res.append( (row, col) );
+        res = list(map(type_arete, res));
+        
+    elif isinstance(mat, set) or isinstance(mat, list) :
+        # FAUX ce qui est ecrit et en commentaire
+#        df_mat = transform_to_df(mat)
+#        for arete in it.combinations(df_mat,2):
+#            res.append(arete);
+#        res = list(map(type_arete, res));
         pass
+        
+    elif isinstance(mat, dict) :
+        df_mat = transform_dico_to_matrix(mat)
+        for row, col in range_2d(df_mat.columns.tolist()):
+            if df_mat.loc[row,col] == 0 or df_mat.loc[col,row] == 0:
+                res.append( (row, col) );
+        res = list(map(type_arete, res));
+        
     return res;
     
 def gamma(matE):    
