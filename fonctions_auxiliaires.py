@@ -106,7 +106,7 @@ def transform_dico_to_matrix(dico) :
     df = pd.DataFrame(columns = sommets, index = sommets)
     aretes = list();
     for sommet, voisins in dico.items() :
-        aretes.extend( it.product(sommet, voisins) )
+        aretes.extend( it.product({sommet}, voisins) )
     for arete in aretes :
         df.loc[arete[0], arete[1]] = 1;
         df.loc[arete[1], arete[0]] = 1;
